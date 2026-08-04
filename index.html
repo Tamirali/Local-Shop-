@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Local Shop - डिजिटल बाज़ार</title>
+
+    <!-- QRCode library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+    <!-- Firebase SDKs (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+
+    <style>
+        /* ===== RESET & BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f8;
+            min-height: 100vh;
+            padding-bottom: 100px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, #FF6B35 0%, #FF4081 40%, #7C4DFF 80%, #00BCD4 100%);
+            background-size: 300% 300%;
+            animation: gradientShift 6s ease-in-out infinite alternate;
+            color: white;
+            text-align: center;
+            padding: 28px 20px 22px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(255, 107, 53, 0.35);
+            border-bottom: 4px solid rgba(255, 255, 255, 0.25);
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .header h1 {
+            font-size: 32px;
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+        }
+        .header h1 i {
+            margin-right: 12px;
+            color: #FFD700;
+            filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+        }
+        .header .sub-title {
+            font-size: 15px;
+            opacity: 0.95;
+            margin-top: 6px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.15);
+        }
+        .header .header-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+            padding: 4px 18px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .lang-toggle {
+            position: absolute;
+            top: 16px;
+            right: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .connection-status {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .connection-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .connection-status .dot.online { background: #2ecc71; }
+
+        /* ===== NAV TABS ===== */
+        .nav-tabs {
+            display: flex;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            position: sticky;
+            top: 78px;
+            z-index: 99;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 16px 10px;
+            border: none;
+            background: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #777;
+            border-bottom: 4px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            color: #FF6B35;
+            border-bottom-color: #FF6B35;
+            background: #fff8f5;
+        }
+
+        /* ===== CONTAINER ===== */
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 16px 12px 80px 12px;
+        }
+        .panel {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        .panel.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== PRODUCT SCROLL ===== */
+        .products-scroll {
+            display: flex;
+            gap: 18px;
+            overflow-x: auto;
+            padding: 4px 2px 16px 2px;
+        }
+        .product-card-horizontal {
+            min-width: 190px;
+            max-width: 210px;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #f0f0f0;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .product-card-horizontal .product-img-container {
+            width: 100%;
+            height: 180px;
+            background: #f0eaff;
+        }
+        .product-card-horizontal .product-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .product-info { padding: 12px 14px 8px; flex: 1; }
+        .product-info .name { font-weight: 700; font-size: 14px; }
+        .product-info .price { color: #FF6B35; font-weight: 800; font-size: 17px; }
+        .add-cart-btn {
+            background: linear-gradient(135deg, #FF6B35, #FF4081);
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 30px;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 4px 14px 14px 14px;
+        }
+
+        /* ===== FORMS & DASHBOARD ===== */
+        .reg-card, .shop-access-card, .admin-card {
+            background: white;
+            border-radius: 24px;
+            padding: 28px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 6px 28px rgba(0,0,0,0.05);
+        }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 13px 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 14px;
+            font-size: 14px;
+            background: #fafbff;
+        }
+        .btn-primary {
+            width: 100%;
+            background: linear-gradient(135deg, #FF6B35, #FF4081);
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            color: white;
+            padding: 14px 28px;
+            border-radius: 30px;
+            z-index: 999;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <div class="header">
+        <div class="connection-status">
+            <span class="dot online" id="statusDot"></span>
+            <span id="statusText">🟢 ऑनलाइन</span>
+        </div>
+        <h1><i class="fas fa-store-alt"></i> <span id="appTitle">Local Shop</span></h1>
+        <div class="sub-title">✨ अपनी लोकल दुकानों से सीधे जुड़ें और ऑर्डर करें ★</div>
+    </div>
+
+    <!-- ===== NAV TABS ===== -->
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('bazaar', this)"><i class="fas fa-shopping-bag"></i> बाजार</button>
+        <button class="tab-btn" onclick="switchTab('dukandar', this)"><i class="fas fa-store"></i> दुकानदार</button>
+        <button class="tab-btn" onclick="switchTab('admin', this)"><i class="fas fa-user-shield"></i> एडमिन</button>
+    </div>
+
+    <!-- ===== CONTAINER ===== -->
+    <div class="container">
+
+        <!-- ===== BAZAAR PANEL ===== -->
+        <div id="panel-bazaar" class="panel active">
+            <div id="bazaarProductsList">
+                <p style="text-align: center; padding: 20px;">लोड हो रहा है...</p>
+            </div>
+        </div>
+
+        <!-- ===== DUKANDAR PANEL ===== -->
+        <div id="panel-dukandar" class="panel">
+            <div class="reg-card">
+                <h3><i class="fas fa-store"></i> दुकान का रजिस्ट्रेशन</h3>
+                <div class="form-group">
+                    <label>दुकान का नाम *</label>
+                    <input type="text" id="shopNameInput" placeholder="उदा: वर्मा इलेक्ट्रॉनिक्स" />
+                </div>
+                <div class="form-group">
+                    <label>व्हाट्सएप मोबाइल नंबर *</label>
+                    <input type="tel" id="shopMobile" placeholder="10 अंकों का नंबर" />
+                </div>
+                <button class="btn-primary" onclick="registerNewShop()">दुकान रजिस्टर करें</button>
+            </div>
+        </div>
+
+        <!-- ===== ADMIN PANEL (Firebase Auth Secured) ===== -->
+        <div id="panel-admin" class="panel">
+            <!-- Firebase Auth Login Box -->
+            <div id="adminLoginForm" class="admin-card">
+                <h3><i class="fas fa-lock"></i> एडमिन लॉगिन (Firebase Auth)</h3>
+                <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Firebase Authentication ईमेल और पासवर्ड दर्ज करें</p>
+                <div class="form-group">
+                    <label>एडमिन ईमेल (Email)</label>
+                    <input type="email" id="adminEmail" placeholder="admin@example.com" />
+                </div>
+                <div class="form-group">
+                    <label>पासवर्ड (Password)</label>
+                    <input type="password" id="adminPassword" placeholder="••••••••" />
+                </div>
+                <button class="btn-primary" onclick="loginAdminWithFirebase()">लॉगिन करें</button>
+            </div>
+
+            <!-- Main Admin Dashboard Content (Hidden by default) -->
+            <div id="adminDashboardContent" style="display: none;">
+                <div class="admin-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3><i class="fas fa-tags"></i> कैटगरी मैनेजमेंट</h3>
+                        <button onclick="logoutAdmin()" style="background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:8px; cursor:pointer;">लॉगआउट</button>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="adminNewCatInput" placeholder="नई कैटगरी" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc;" />
+                        <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="addNewCategory()">सेव करें</button>
+                    </div>
+                </div>
+                <h3><i class="fas fa-users-cog"></i> सभी पंजीकृत दुकानें</h3>
+                <div id="adminShopsList" style="margin-top:15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== JAVASCRIPT ===== -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWxR2Bhu72Piyp7upTT20nGVNZlrwe2IA",
+            authDomain: "local-shop-50d51.firebaseapp.com",
+            databaseURL: "https://local-shop-50d51-default-rtdb.firebaseio.com",
+            projectId: "local-shop-50d51",
+            storageBucket: "local-shop-50d51.firebasestorage.app",
+            messagingSenderId: "986425135923",
+            appId: "1:986425135923:web:90bb50e2500eb29606a446",
+            measurementId: "G-DYHWH7G8W2"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let shops = [];
+        let products = [];
+        let categories = [];
+
+        // Dynamic auth monitor
+        auth.onAuthStateChanged(user => {
+            if (user && !user.isAnonymous) {
+                // Verified Admin
+                document.getElementById('adminLoginForm').style.display = 'none';
+                document.getElementById('adminDashboardContent').style.display = 'block';
+            } else {
+                // Anonymous or Logged Out
+                document.getElementById('adminLoginForm').style.display = 'block';
+                document.getElementById('adminDashboardContent').style.display = 'none';
+            }
+            initListeners();
+        });
+
+        // Firebase Admin Login Function
+        function loginAdminWithFirebase() {
+            const email = document.getElementById('adminEmail').value.trim();
+            const password = document.getElementById('adminPassword').value.trim();
+
+            if (!email || !password) {
+                showToast("❌ कृपया ईमेल और पासवर्ड दर्ज करें");
+                return;
+            }
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    showToast("✅ एडमिन लॉगिन सफल!");
+                })
+                .catch((error) => {
+                    showToast("❌ गलत ईमेल या पासवर्ड!");
+                    console.error("Auth Error:", error.message);
+                });
+        }
+
+        // Firebase Logout
+        function logoutAdmin() {
+            auth.signOut().then(() => {
+                showToast("🔒 लॉगआउट सफल!");
+                auth.signInAnonymously(); // Revert back to anonymous
+            });
+        }
+
+        function initListeners() {
+            db.collection('shops').onSnapshot(snapshot => {
+                shops = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAdminShops();
+            });
+
+            db.collection('products').onSnapshot(snapshot => {
+                products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderBazaar();
+            });
+        }
+
+        function switchTab(tab, btn) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(`panel-${tab}`).classList.add('active');
+            if(btn) btn.classList.add('active');
+        }
+
+        function renderBazaar() {
+            const container = document.getElementById('bazaarProductsList');
+            if (products.length === 0) {
+                container.innerHTML = `<p style="text-align:center;">कोई उत्पाद उपलब्ध नहीं है</p>`;
+                return;
+            }
+            let html = '<div class="products-scroll">';
+            products.forEach(p => {
+                html += `
+                    <div class="product-card-horizontal">
+                        <div class="product-img-container">
+                            <img src="${p.img || 'https://via.placeholder.com/150'}" alt="${p.name}">
+                        </div>
+                        <div class="product-info">
+                            <div class="name">${p.name}</div>
+                            <div class="price">₹${p.price}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function registerNewShop() {
+            const name = document.getElementById('shopNameInput').value;
+            const mobile = document.getElementById('shopMobile').value;
+
+            if (!name || !mobile) {
+                showToast("❌ कृपया नाम और मोबाइल नंबर भरें");
+                return;
+            }
+
+            const code = "LM-" + Math.floor(100000 + Math.random() * 900000);
+            db.collection('shops').add({
+                name, mobile, code, isActive: true, createdAt: Date.now()
+            }).then(() => {
+                showToast(`✅ दुकान रजिस्टर हुई! कोड: ${code}`);
+            });
+        }
+
+        function renderAdminShops() {
+            const container = document.getElementById('adminShopsList');
+            if (!container) return;
+            if (shops.length === 0) {
+                container.innerHTML = "<p>कोई पंजीकृत दुकान नहीं है</p>";
+                return;
+            }
+            container.innerHTML = shops.map(s => `
+                <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #eee;">
+                    <h4>${s.name} (${s.code})</h4>
+                    <p>📱 ${s.mobile}</p>
+                </div>
+            `).join('');
+        }
+
+        function addNewCategory() {
+            const cat = document.getElementById('adminNewCatInput').value.trim();
+            if (cat) {
+                db.collection('categories').add({ name: cat }).then(() => {
+                    showToast("✅ नई कैटगरी जोड़ी गई!");
+                    document.getElementById('adminNewCatInput').value = '';
+                });
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
